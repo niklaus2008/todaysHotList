@@ -28,6 +28,102 @@
             color: white;
             margin-bottom: 30px;
             padding: 20px;
+            position: relative;
+        }
+        
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            padding: 8px 16px;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        /* 夜间模式样式 */
+        body.dark-mode {
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+        }
+        
+        body.dark-mode .repo-card {
+            background: rgba(45, 55, 72, 0.95);
+            border-color: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode .repo-name {
+            color: #63b3ed;
+        }
+        
+        body.dark-mode .repo-name:hover {
+            color: #90cdf4;
+        }
+        
+        body.dark-mode .repo-description {
+            color: #a0aec0;
+        }
+        
+        body.dark-mode .stat {
+            color: #cbd5e0;
+        }
+        
+        body.dark-mode .repo-meta {
+            border-top-color: #4a5568;
+            color: #a0aec0;
+        }
+        
+        body.dark-mode .github-controls {
+            background: rgba(26, 32, 44, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        body.dark-mode .control-group label {
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode input,
+        body.dark-mode select {
+            background: rgba(74, 85, 104, 0.9);
+            color: #e2e8f0;
+            border: 1px solid #4a5568;
+        }
+        
+        body.dark-mode input:focus,
+        body.dark-mode select:focus {
+            background: #4a5568;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.3);
+        }
+        
+        body.dark-mode .welcome-message {
+            background: rgba(26, 32, 44, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        body.dark-mode .error {
+            background: rgba(254, 215, 215, 0.1);
+            border-color: rgba(245, 101, 101, 0.3);
+        }
+        
+        body.dark-mode .pagination button {
+            background: rgba(74, 85, 104, 0.8);
+            border-color: #4a5568;
+            color: #e2e8f0;
+        }
+        
+        body.dark-mode .pagination button:hover {
+            background: rgba(66, 153, 225, 0.3);
         }
         
         .header h1 {
@@ -242,6 +338,36 @@
             font-style: italic;
         }
         
+        .copy-link-btn {
+            background: linear-gradient(135deg, #48bb78, #38a169);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .copy-link-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+            background: linear-gradient(135deg, #38a169, #2f855a);
+        }
+        
+        .copy-link-btn.copied {
+            background: linear-gradient(135deg, #4299e1, #3182ce);
+        }
+        
+        .copy-link-btn.copied:hover {
+            background: linear-gradient(135deg, #3182ce, #2b6cb0);
+        }
+        
         .pagination {
             display: flex;
             justify-content: center;
@@ -318,6 +444,7 @@
         <div class="header">
             <h1>🔥 热门榜单聚合平台</h1>
             <p>一站式浏览各大平台的热门内容</p>
+            <button class="theme-toggle" id="themeToggle">🌙 夜间模式</button>
         </div>
         
         <div class="platform-selector">
@@ -517,6 +644,10 @@
                         <span class="updated-at">更新于: ${formatDate(repo.updatedAt)}</span>
                         <span>创建于: ${formatDate(repo.createdAt)}</span>
                     </div>
+                    
+                    <button class="copy-link-btn" onclick="copyToClipboard('${repo.url}', this)">
+                        📋 复制链接
+                    </button>
                 </div>
             `).join('');
             
@@ -554,6 +685,56 @@
             }
         }
         
+        // 复制到剪贴板函数
+        async function copyToClipboard(text, buttonElement) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    // 使用现代 Clipboard API
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    // 使用传统的execCommand方法作为备选
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    textArea.style.top = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    
+                    if (!successful) {
+                        throw new Error('复制失败');
+                    }
+                }
+                
+                // 显示复制成功提示
+                const originalText = buttonElement.innerHTML;
+                buttonElement.innerHTML = '✅ 已复制';
+                buttonElement.classList.add('copied');
+                
+                // 2秒后恢复原状
+                setTimeout(() => {
+                    buttonElement.innerHTML = originalText;
+                    buttonElement.classList.remove('copied');
+                }, 2000);
+                
+            } catch (error) {
+                console.error('复制失败:', error);
+                // 显示错误提示
+                const originalText = buttonElement.innerHTML;
+                buttonElement.innerHTML = '❌ 复制失败';
+                buttonElement.style.background = 'linear-gradient(135deg, #e53e3e, #c53030)';
+                
+                setTimeout(() => {
+                    buttonElement.innerHTML = originalText;
+                    buttonElement.style.background = '';
+                }, 2000);
+            }
+        }
+        
         // 添加输入框回车事件
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('minStars').addEventListener('keypress', function(e) {
@@ -561,7 +742,53 @@
                     loadRepositories();
                 }
             });
+            
+            // 初始化主题切换
+            initThemeToggle();
         });
+        
+        // 主题切换功能
+        function initThemeToggle() {
+            const themeToggle = document.getElementById('themeToggle');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            // 检查本地存储的主题偏好
+            const savedTheme = localStorage.getItem('theme');
+            const isDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
+            
+            if (isDark) {
+                document.body.classList.add('dark-mode');
+                themeToggle.textContent = '☀️ 日间模式';
+            } else {
+                themeToggle.textContent = '🌙 夜间模式';
+            }
+            
+            // 监听主题切换按钮点击
+            themeToggle.addEventListener('click', function() {
+                const isDarkMode = document.body.classList.toggle('dark-mode');
+                
+                if (isDarkMode) {
+                    themeToggle.textContent = '☀️ 日间模式';
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    themeToggle.textContent = '🌙 夜间模式';
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+            
+            // 监听系统主题变化
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+                if (!localStorage.getItem('theme')) {
+                    if (e.matches) {
+                        document.body.classList.add('dark-mode');
+                        themeToggle.textContent = '☀️ 日间模式';
+                    } else {
+                        document.body.classList.remove('dark-mode');
+                        themeToggle.textContent = '🌙 夜间模式';
+                    }
+                }
+            });
+        }
     </script>
 </body>
 </html>

@@ -202,6 +202,26 @@ document.addEventListener('DOMContentLoaded', function() {
             indexSpan.className = 'hot-index';
             indexSpan.textContent = item.index;
             
+            // 创建复制链接按钮
+            const copyButton = document.createElement('button');
+            copyButton.className = 'copy-link-btn';
+            copyButton.innerHTML = '📋 复制链接';
+            copyButton.title = '复制链接';
+            copyButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                copyToClipboard(item.url);
+                
+                // 显示复制成功提示
+                copyButton.innerHTML = '✅ 已复制';
+                copyButton.classList.add('copied');
+                
+                // 2秒后恢复原状
+                setTimeout(() => {
+                    copyButton.innerHTML = '📋 复制链接';
+                    copyButton.classList.remove('copied');
+                }, 2000);
+            });
+            
             // 创建内容容器
             const contentDiv = document.createElement('div');
             contentDiv.className = 'hot-content';
@@ -226,11 +246,49 @@ document.addEventListener('DOMContentLoaded', function() {
             listItem.appendChild(rankSpan);
             listItem.appendChild(titleLink);
             listItem.appendChild(indexSpan);
+            listItem.appendChild(copyButton);
             listItem.appendChild(contentDiv);
             
             // 将列表项添加到热榜列表
             hotList.appendChild(listItem);
         });
+    }
+    
+    // 复制到剪贴板函数
+    function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            // 使用现代 Clipboard API
+            navigator.clipboard.writeText(text).catch(err => {
+                console.error('复制失败:', err);
+                fallbackCopyToClipboard(text);
+            });
+        } else {
+            // 使用传统的execCommand方法作为备选
+            fallbackCopyToClipboard(text);
+        }
+    }
+    
+    // 传统的复制方法
+    function fallbackCopyToClipboard(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (!successful) {
+                console.error('复制失败');
+            }
+        } catch (err) {
+            console.error('复制失败:', err);
+        }
+        
+        document.body.removeChild(textArea);
     }
     
 
