@@ -16,23 +16,46 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // 获取热榜数据
-    function fetchHotList(website) {
+    async function fetchHotList(website) {
         // 显示加载动画
         showLoading();
         
         // 清空之前的列表
         hotList.innerHTML = '';
         
-        // 所有网站使用模拟数据
-        setTimeout(() => {
-            try {
-                const data = getMockData(website);
-                render极客时间(data, website);
-                hideLoading();
-            } catch (error) {
-                showError();
+        try {
+            let apiUrl;
+            let data;
+            
+            // 根据选择的网站调用不同的API
+            if (website === 'github') {
+                apiUrl = '/api/github/repositories?perPage=10';
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const result = await response.json();
+                if (result.success) {
+                    data = result.data.map(repo => ({
+                        title: repo.fullName || repo.name,
+                        url: repo.url,
+                        index: `${repo.stars} stars`,
+                        description: repo.description
+                    }));
+                } else {
+                    throw new Error(result.error);
+                }
+            } else {
+                // 其他网站暂时使用模拟数据
+                data = getMockData(website);
             }
-        }, 800); // 模拟网络请求延迟
+            
+            renderHotList(data, website);
+            hideLoading();
+        } catch (error) {
+            console.error('获取数据失败:', error);
+            showError(`获取数据失败: ${error.message}`);
+        }
     }
     
     // 显示加载动画
@@ -50,15 +73,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 显示错误信息
-    function showError() {
+    function showError(message = '获取数据失败，请稍后再试') {
         loadingElement.classList.add('hidden');
         errorElement.classList.remove('hidden');
+        errorElement.innerHTML = `<p>${message}</p>`;
         hotList.classList.add('hidden');
     }
     
     // 渲染热榜列表
     function renderHotList(data, website) {
         hotList.innerHTML = '';
+        
+        if (!data || data.length === 0) {
+            const emptyMessage = document.createElement('li');
+            emptyMessage.className = 'empty-message';
+            emptyMessage.textContent = '暂无数据';
+            hotList.appendChild(emptyMessage);
+            return;
+        }
         
         data.forEach((item, index) => {
             const listItem = document.createElement('li');
@@ -74,12 +106,21 @@ document.addEventListener('DOMContentLoaded', function() {
             titleLink.href = item.url;
             titleLink.className = 'hot-title';
             titleLink.textContent = item.title;
-            titleLink.target = '_blank'; // 在新标签页打开
+            titleLink.target = '_blank';
+            titleLink.rel = 'noopener noreferrer';
             
             // 创建热度指数元素
             const indexSpan = document.createElement('span');
             indexSpan.className = 'hot-index';
             indexSpan.textContent = item.index;
+            
+            // 添加描述（如果有）
+            if (item.description) {
+                const descSpan = document.createElement('p');
+                descSpan.className = 'hot-description';
+                descSpan.textContent = item.description;
+                listItem.appendChild(descSpan);
+            }
             
             // 将元素添加到列表项
             listItem.appendChild(rankSpan);
