@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const hotList = document.getElementById('hot-list');
     const loadingElement = document.getElementById('loading');
     const errorElement = document.getElementById('error-message');
+    const retryButton = document.getElementById('retry-button');
     
     // 监听下拉框变化事件
     websiteSelector.addEventListener('change', function() {
@@ -14,9 +15,29 @@ document.addEventListener('DOMContentLoaded', function() {
             fetchHotList(selectedWebsite);
         }
     });
+
+    // 重试按钮点击事件
+    if (retryButton) {
+        retryButton.addEventListener('click', function() {
+            const selectedWebsite = websiteSelector.value;
+            if (selectedWebsite) {
+                fetchHotList(selectedWebsite);
+            }
+        });
+    }
+    
+    // 检查本地存储中是否有上次选择
+    const lastSelectedWebsite = localStorage.getItem('lastSelectedWebsite');
+    if (lastSelectedWebsite && websiteSelector.querySelector(`option[value="${lastSelectedWebsite}"]`)) {
+        websiteSelector.value = lastSelectedWebsite;
+        fetchHotList(lastSelectedWebsite);
+    }
     
     // 获取热榜数据
     async function fetchHotList(website) {
+        // 保存选择到本地存储
+        localStorage.setItem('lastSelectedWebsite', website);
+        
         // 显示加载动画
         showLoading();
         
@@ -27,27 +48,51 @@ document.addEventListener('DOMContentLoaded', function() {
             let apiUrl;
             let data;
             
+            // 检查本地缓存
+            const cacheKey = `hotlist:${website}`;
+            const cachedData = localStorage.getItem(cacheKey);
+            const cachedTimestamp = localStorage.getItem(`${cacheKey}:timestamp`);
+            
+            // 如果缓存存在且未过期（5分钟）
+            if (cachedData && cachedTimestamp && (Date.now() - parseInt(cachedTimestamp)) < 300000) {
+                data = JSON.parse(cachedData);
+                renderHotList(data, website);
+                hideLoading();
+                return;
+            }
+            
             // 根据选择的网站调用不同的API
             if (website === 'github') {
                 apiUrl = '/api/github/repositories?perPage=10';
-                const response = await fetch(apiUrl);
+                const response = await fetchWithTimeout(apiUrl, { timeout: 10000 });
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
+                
                 const result = await response.json();
                 if (result.success) {
                     data = result.data.map(repo => ({
                         title: repo.fullName || repo.name,
                         url: repo.url,
-                        index: `${repo.stars} stars`,
-                        description: repo.description
+                        index: `${formatNumber(repo.stars)} stars`,
+                        description: repo.description,
+                        language: repo.language
                     }));
+                    
+                    // 缓存数据
+                    localStorage.setItem(cacheKey, JSON.stringify(data));
+                    localStorage.setItem(`${cacheKey}:timestamp`, Date.now().toString());
                 } else {
-                    throw new Error(result.error);
+                    throw new Error(result.error || 'GitHub API返回错误');
                 }
             } else {
                 // 其他网站暂时使用模拟数据
                 data = getMockData(website);
+                // 模拟数据也缓存
+                localStorage.setItem(cacheKey, JSON.stringify(data));
+                localStorage.setItem(`${cacheKey}:timestamp`, Date.now().toString());
             }
             
             renderHotList(data, website);
@@ -58,12 +103,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // 带超时的fetch函数
+    async function fetchWithTimeout(resource, options = {}) {
+        const { timeout = 8000 } = options;
+        
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        
+        const response = await fetch(resource, {
+            ...options,
+            signal: controller.signal
+        });
+        
+        clearTimeout(id);
+        return response;
+    }
+
+    // 数字格式化
+    function formatNumber(num) {
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(1) + 'K';
+        }
+        return num.toString();
+    }
+
     // 显示加载动画
     function showLoading() {
         loadingElement.classList.remove('hidden');
         errorElement.classList.add('hidden');
         hotList.classList.add('hidden');
-        document.querySelector('.placeholder-message').classList.add('hidden');
+        const placeholder = document.querySelector('.placeholder-message');
+        if (placeholder) {
+            placeholder.classList.add('hidden');
+        }
     }
     
     // 隐藏加载动画
@@ -76,8 +150,22 @@ document.addEventListener('DOMContentLoaded', function() {
     function showError(message = '获取数据失败，请稍后再试') {
         loadingElement.classList.add('hidden');
         errorElement.classList.remove('hidden');
-        errorElement.innerHTML = `<p>${message}</p>`;
+        errorElement.innerHTML = `
+            <p>${message}</p>
+            <button id="retry-button" class="retry-button">重试</button>
+        `;
         hotList.classList.add('hidden');
+        
+        // 重新绑定重试按钮事件
+        const retryBtn = document.getElementById('retry-button');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', function() {
+                const selectedWebsite = websiteSelector.value;
+                if (selectedWebsite) {
+                    fetchHotList(selectedWebsite);
+                }
+            });
+        }
     }
     
     // 渲染热榜列表
@@ -114,18 +202,31 @@ document.addEventListener('DOMContentLoaded', function() {
             indexSpan.className = 'hot-index';
             indexSpan.textContent = item.index;
             
+            // 创建内容容器
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'hot-content';
+            
             // 添加描述（如果有）
             if (item.description) {
                 const descSpan = document.createElement('p');
                 descSpan.className = 'hot-description';
                 descSpan.textContent = item.description;
-                listItem.appendChild(descSpan);
+                contentDiv.appendChild(descSpan);
+            }
+            
+            // 添加语言标签（如果有）
+            if (item.language) {
+                const langSpan = document.createElement('span');
+                langSpan.className = 'hot-language';
+                langSpan.textContent = item.language;
+                contentDiv.appendChild(langSpan);
             }
             
             // 将元素添加到列表项
             listItem.appendChild(rankSpan);
             listItem.appendChild(titleLink);
             listItem.appendChild(indexSpan);
+            listItem.appendChild(contentDiv);
             
             // 将列表项添加到热榜列表
             hotList.appendChild(listItem);

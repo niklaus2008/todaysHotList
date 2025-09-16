@@ -1,4 +1,6 @@
 const fetch = require('node-fetch');
+const cache = require('../utils/cache');
+const Validation = require('../utils/validation');
 
 class GitHubAPI {
   constructor() {
@@ -7,6 +9,11 @@ class GitHubAPI {
       'Accept': 'application/vnd.github.v3+json',
       'User-Agent': 'todays-hotlist-proxy/1.0.0'
     };
+    
+    // 添加认证头（如果提供了GITHUB_TOKEN）
+    if (process.env.GITHUB_TOKEN) {
+      this.defaultHeaders['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
+    }
   }
 
   /**
@@ -18,11 +25,26 @@ class GitHubAPI {
    */
   async searchRepositoriesByStars(minStars = 1000, perPage = 10, page = 1) {
     try {
+      // 参数验证
+      const validatedParams = Validation.validateSearchParams(minStars, perPage, page);
+      minStars = validatedParams.minStars;
+      perPage = validatedParams.perPage;
+      page = validatedParams.page;
+
       const query = `stars:>${minStars}`;
+      const cacheKey = `search:${query}:${perPage}:${page}`;
+      
+      // 检查缓存
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
+
       const url = `${this.baseURL}/search/repositories?q=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&sort=stars&order=desc`;
       
       const response = await fetch(url, {
-        headers: this.defaultHeaders
+        headers: this.defaultHeaders,
+        timeout: 10000 // 10秒超时
       });
 
       if (!response.ok) {
@@ -31,7 +53,13 @@ class GitHubAPI {
 
       const data = await response.json();
       
-      return {
+      // 检查API限制
+      const rateLimit = response.headers.get('x-ratelimit-remaining');
+      if (rateLimit && parseInt(rateLimit) < 10) {
+        console.warn(`⚠️ GitHub API速率限制警告: 剩余 ${rateLimit} 次请求`);
+      }
+
+      const result = {
         success: true,
         totalCount: data.total_count,
         items: data.items.map(item => ({
@@ -50,12 +78,19 @@ class GitHubAPI {
           perPage,
           page,
           totalPages: Math.ceil(data.total_count / perPage)
-        }
+        },
+        cached: false
       };
+
+      // 缓存结果（5分钟）
+      cache.set(cacheKey, result, 300000);
+      
+      return result;
     } catch (error) {
+      console.error('GitHub搜索错误:', error.message);
       return {
         success: false,
-        error: error.message,
+        error: `GitHub API错误: ${error.message}`,
         items: []
       };
     }
@@ -70,10 +105,24 @@ class GitHubAPI {
    */
   async getUserRepositories(username, perPage = 10, page = 1) {
     try {
+      // 参数验证
+      const validatedUsername = Validation.validateGitHubUsername(username);
+      const validatedPagination = Validation.validatePagination(page, perPage);
+      username = validatedUsername;
+      perPage = validatedPagination.perPage;
+      page = validatedPagination.page;
+
+      const cacheKey = `user:${username}:${perPage}:${page}`;
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
+
       const url = `${this.baseURL}/users/${username}/repos?per_page=${perPage}&page=${page}&sort=updated`;
       
       const response = await fetch(url, {
-        headers: this.defaultHeaders
+        headers: this.defaultHeaders,
+        timeout: 10000
       });
 
       if (!response.ok) {
@@ -82,7 +131,7 @@ class GitHubAPI {
 
       const data = await response.json();
       
-      return {
+      const result = {
         success: true,
         items: data.map(repo => ({
           id: repo.id,
@@ -99,12 +148,18 @@ class GitHubAPI {
         pagination: {
           perPage,
           page
-        }
+        },
+        cached: false
       };
+
+      cache.set(cacheKey, result, 300000);
+      
+      return result;
     } catch (error) {
+      console.error('获取用户仓库错误:', error.message);
       return {
         success: false,
-        error: error.message,
+        error: `GitHub API错误: ${error.message}`,
         items: []
       };
     }
@@ -118,10 +173,23 @@ class GitHubAPI {
    */
   async getRepository(owner, repo) {
     try {
+      // 参数验证
+      const validatedOwner = Validation.validateGitHubUsername(owner);
+      const validatedRepo = Validation.validateRepoName(repo);
+      owner = validatedOwner;
+      repo = validatedRepo;
+
+      const cacheKey = `repo:${owner}:${repo}`;
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
+
       const url = `${this.baseURL}/repos/${owner}/${repo}`;
       
       const response = await fetch(url, {
-        headers: this.defaultHeaders
+        headers: this.defaultHeaders,
+        timeout: 10000
       });
 
       if (!response.ok) {
@@ -130,7 +198,7 @@ class GitHubAPI {
 
       const data = await response.json();
       
-      return {
+      const result = {
         success: true,
         data: {
           id: data.id,
@@ -146,13 +214,23 @@ class GitHubAPI {
           license: data.license?.name,
           topics: data.topics || [],
           openIssues: data.open_issues_count,
-          watchers: data.watchers_count
-        }
+          watchers: data.watchers_count,
+          defaultBranch: data.default_branch,
+          size: data.size,
+          archived: data.archived,
+          disabled: data.disabled
+        },
+        cached: false
       };
+
+      cache.set(cacheKey, result, 300000);
+      
+      return result;
     } catch (error) {
+      console.error('获取仓库详情错误:', error.message);
       return {
         success: false,
-        error: error.message
+        error: `GitHub API错误: ${error.message}`
       };
     }
   }
@@ -163,10 +241,17 @@ class GitHubAPI {
    */
   async getRateLimit() {
     try {
+      const cacheKey = 'rate_limit';
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
+
       const url = `${this.baseURL}/rate_limit`;
       
       const response = await fetch(url, {
-        headers: this.defaultHeaders
+        headers: this.defaultHeaders,
+        timeout: 5000
       });
 
       if (!response.ok) {
@@ -175,15 +260,22 @@ class GitHubAPI {
 
       const data = await response.json();
       
-      return {
+      const result = {
         success: true,
         rateLimit: data.rate,
-        resources: data.resources
+        resources: data.resources,
+        cached: false
       };
+
+      // 速率限制信息缓存1分钟
+      cache.set(cacheKey, result, 60000);
+      
+      return result;
     } catch (error) {
+      console.error('获取速率限制错误:', error.message);
       return {
         success: false,
-        error: error.message
+        error: `GitHub API错误: ${error.message}`
       };
     }
   }
