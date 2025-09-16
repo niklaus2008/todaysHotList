@@ -1,7 +1,7 @@
 {
   "name": "todays-hotlist-proxy",
   "version": "1.0.0",
-  "description": "本地代理服务器用于获取知乎热榜数据",
+  "description": "本地代理服务器用于热榜数据聚合",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -22,7 +22,6 @@
   },
   "keywords": [
     "proxy",
-    "zhihu",
     "hotlist",
     "api"
   ],

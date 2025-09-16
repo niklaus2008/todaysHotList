@@ -23,22 +23,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // 清空之前的列表
         hotList.innerHTML = '';
         
-        // 根据选择的网站获取数据
-        if (website === 'zhihu') {
-            // 使用真实API获取知乎热榜
-            fetchZhihuHotList();
-        } else {
-            // 其他网站使用模拟数据
-            setTimeout(() => {
-                try {
-                    const data = getMockData(website);
-                    renderHotList(data, website);
-                    hideLoading();
-                } catch (error) {
-                    showError();
-                }
-            }, 800); // 模拟网络请求延迟
-        }
+        // 所有网站使用模拟数据
+        setTimeout(() => {
+            try {
+                const data = getMockData(website);
+                render极客时间(data, website);
+                hideLoading();
+            } catch (error) {
+                showError();
+            }
+        }, 800); // 模拟网络请求延迟
     }
     
     // 显示加载动画
@@ -97,101 +91,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // 获取知乎热榜数据 - 通过本地代理服务器解决CORS问题
-    function fetchZhihuHotList() {
-        showLoading();
-        
-        const proxyApiUrl = 'http://localhost:3002/api/zhihu-hot';
-        
-        fetch(proxyApiUrl)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`代理服务器请求失败: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    // 转换数据格式以适应前端渲染
-                    const formattedData = data.data.map(item => ({
-                        title: item.title,
-                        url: item.url,
-                        index: item.hotValue
-                    }));
-                    renderHotList(formattedData, 'zhihu');
-                    hideLoading();
-                    
-                    if (data.isBackup) {
-                        console.log('⚠️ 使用备用数据（知乎API需要认证）');
-                    } else {
-                        console.log('✅ 成功获取实时知乎热榜数据');
-                    }
-                } else {
-                    throw new Error(data.message || '服务器返回错误');
-                }
-            })
-            .catch(error => {
-                console.error('获取知乎热榜失败:', error.message);
-                // 失败时使用模拟数据作为备选
-                useFallbackZhihuData();
-            });
-    }
+
+
     
-    // 备用数据方案
-    function useFallbackZhihuData() {
-        console.log('使用备用模拟数据');
-        setTimeout(() => {
-            try {
-                const now = new Date();
-                const hotListData = generateRealisticZhihuData(now);
-                renderHotList(hotListData, 'zhihu');
-                hideLoading();
-            } catch (error) {
-                console.error('备用数据也失败:', error);
-                showError();
-            }
-        }, 600);
-    }
-    
-    // 生成模拟数据（备用方案）
-    function generateRealisticZhihuData(timestamp) {
-        const baseTopics = [
-            "人工智能", "科技创新", "经济发展", "教育改革", "医疗健康",
-            "环境保护", "国际关系", "文化传承", "职场发展", "生活品质"
-        ];
-        
-        const hotValues = [
-            "4852万热度", "4321万热度", "3987万热度", "3765万热度", "3543万热度",
-            "3321万热度", "3109万热度", "2987万热度", "2765万热度", "2543万热度"
-        ];
-        
-        return Array.from({ length: 10 }, (_, index) => {
-            const topic = baseTopics[index % baseTopics.length];
-            
-            return {
-                title: `${topic}：${getSpecificTopic(index)}`,
-                url: `https://www.zhihu.com/question/${50000000 + index}`,
-                index: hotValues[index]
-            };
-        });
-    }
-    
-    // 获取具体话题内容
-    function getSpecificTopic(index) {
-        const topics = [
-            "ChatGPT带来的变革与挑战",
-            "中国芯片产业的突破与发展", 
-            "数字经济下的就业新机遇",
-            "双减政策后的教育生态",
-            "精准医疗的技术创新",
-            "碳中和目标下的绿色转型",
-            "一带一路国际合作新动态",
-            "传统文化在现代社会的价值",
-            "远程办公模式的优势与局限",
-            "健康生活方式的科学实践"
-        ];
-        return topics[index % topics.length];
-    }
+
     
 
     
@@ -211,18 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 { title: "NBA总决赛", url: "https://s.weibo.com/weibo?q=%23NBA总决赛%23", index: "2,432,109" },
                 { title: "电影票房排行", url: "https://s.weibo.com/weibo?q=%23电影票房排行%23", index: "2,321,098" }
             ],
-            zhihu: [
-                { title: "如何看待2025年经济形势？", url: "https://www.zhihu.com/question/123456789", index: "5,432 万热度" },
-                { title: "为什么越来越多年轻人选择考公务员？", url: "https://www.zhihu.com/question/123456790", index: "4,987 万热度" },
-                { title: "人工智能会取代程序员吗？", url: "https://www.zhihu.com/question/123456791", index: "4,765 万热度" },
-                { title: "如何提高英语口语水平？", url: "https://www.zhihu.com/question/123456792", index: "4,532 万热度" },
-                { title: "有哪些值得推荐的国产电影？", url: "https://www.zhihu.com/question/123456793", index: "4,321 万热度" },
-                { title: "如何科学减肥？", url: "https://www.zhihu.com/question/123456794", index: "4,123 万热度" },
-                { title: "买房和租房哪个更划算？", url: "https://www.zhihu.com/question/123456795", index: "3,987 万热度" },
-                { title: "如何看待大学生就业难问题？", url: "https://www.zhihu.com/question/123456796", index: "3,876 万热度" },
-                { title: "有哪些高性价比的手机推荐？", url: "https://www.zhihu.com/question/123456797", index: "3,765 万热度" },
-                { title: "如何培养孩子的阅读习惯？", url: "https://www.zhihu.com/question/123456798", index: "3,654 万热度" }
-            ],
+
             baidu: [
                 { title: "中秋国庆假期安排", url: "https://www.baidu.com/s?wd=中秋国庆假期安排", index: "4,987,654" },
                 { title: "世界杯最新赛程", url: "https://www.baidu.com/s?wd=世界杯最新赛程", index: "4,876,543" },
