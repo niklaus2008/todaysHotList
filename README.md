@@ -1,6 +1,6 @@
 # 🔥 热门榜单聚合平台
 
-一个基于Node.js + Express的GitHub API代理服务器，提供热门仓库搜索和用户仓库查询功能，带有美观的Web界面。
+一个基于Node.js + Express的GitHub API代理服务器，提供热门仓库搜索和用户仓库查询功能，带有美观的Web界面和AI智能提交功能。
 
 ## ✨ 功能特性
 
@@ -170,6 +170,6 @@ A: 在 `.env` 文件中修改 `PORT` 变量。
 ### Q: 如何自定义搜索条件？
 A: 在前端界面中调整最小star数、每页数量和编程语言筛选。
 
-## 📞 支持
+## 📞 支持2
 
 如有问题，请提交 [Issue](https://github.com/your-repo/issues) 或联系开发团队。
